@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: llmify-cli
-Version: 0.1.0
+Version: 0.1.1
 Summary: LLM-ify: create LLM-ready markdown and text from websites.
 Author: Chillbruhhh
 License: PolyForm Noncommercial License 1.0.0
@@ -53,6 +53,16 @@ Dynamic: license-file
 
 LLM-ify generates `llms.txt` and `llms-full.txt` plus full markdown/text captures for single pages or entire websites, so your LLM has clean, readable context.
 
+## Install + Run
+
+```python
+pip install llmify-cli
+```
+
+```bash
+llmify
+```
+
 ## What is llms.txt?
 
 `llms.txt` is a standardized format for making website content more accessible to Large Language Models (LLMs). It provides:
@@ -76,11 +86,11 @@ LLM-ify generates `llms.txt` and `llms-full.txt` plus full markdown/text capture
 
 ## Quick Setup (Recommended)
 
-Install from PyPI and launch:
+Other launch commands (all open the TUI):
 
 ```bash
-pip install llmify-cli
-llmify
+llm-ify
+llmify-cli
 ```
 
 Run the quickstart script for your OS:
@@ -157,15 +167,15 @@ This installs browser dependencies needed for Crawl4AI.
 
 ### OpenRouter (Optional)
 
-LLM-ify can also use OpenRouter by setting these environment variables:
+LLM-ify can also use OpenRouter. Set the key and choose the provider in the TUI settings:
 
 ```bash
 OPENROUTER_API_KEY="your-openrouter-api-key"
-OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-OPENAI_MODEL="openai/gpt-4.1-nano"
 ```
 
-If `OPENROUTER_API_KEY` is set and `OPENAI_API_KEY` is empty, LLM-ify will use the OpenRouter key automatically.
+### Ollama (Optional)
+
+LLM-ify can use a local Ollama server. Select `ollama` in the TUI and set the model name (for example `llama3.1:8b`). Ollama runs at `http://localhost:11434/v1` by default.
 
 ## Usage (TUI)
 
@@ -176,6 +186,14 @@ python main.py
 ```
 
 Enter a URL, choose a mode (full website or single page), and run. Settings are saved in `config.json` automatically.
+
+### Model Provider + Model Name
+
+Choose the provider in Settings, then set the model name for that provider:
+
+- OpenAI default: `gpt-4.1-nano`
+- OpenRouter default: `openai/gpt-4.1-nano`
+- Ollama: set your local model name (for example `llama3.1:8b`)
 
 ## Output Format
 
