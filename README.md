@@ -138,6 +138,14 @@ python main.py
 
 Enter a URL, choose a mode (full website or single page), and run. Settings are saved in `config.json` automatically.
 
+### Model Provider + Model Name
+
+Choose the provider in Settings, then set the model name for that provider:
+
+- OpenAI default: `gpt-4.1-nano`
+- OpenRouter default: `openai/gpt-4.1-nano`
+- Ollama: set your local model name (for example `llama3.1:8b`)
+
 ## Output Format
 
 ### llms.txt
