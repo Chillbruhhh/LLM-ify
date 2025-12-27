@@ -118,15 +118,15 @@ This installs browser dependencies needed for Crawl4AI.
 
 ### OpenRouter (Optional)
 
-LLM-ify can also use OpenRouter by setting these environment variables:
+LLM-ify can also use OpenRouter. Set the key and choose the provider in the TUI settings:
 
 ```bash
 OPENROUTER_API_KEY="your-openrouter-api-key"
-OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-OPENAI_MODEL="openai/gpt-4.1-nano"
 ```
 
-If `OPENROUTER_API_KEY` is set and `OPENAI_API_KEY` is empty, LLM-ify will use the OpenRouter key automatically.
+### Ollama (Optional)
+
+LLM-ify can use a local Ollama server. Select `ollama` in the TUI and set the model name (for example `llama3.1:8b`). Ollama runs at `http://localhost:11434/v1` by default.
 
 ## Usage (TUI)
 

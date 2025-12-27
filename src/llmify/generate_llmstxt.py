@@ -336,8 +336,9 @@ def collect_config(args: argparse.Namespace) -> Dict[str, Any]:
         "openai_api_key": args.openai_api_key or "",
         "openrouter_api_key": args.openrouter_api_key or "",
         "openai_provider": args.openai_provider,
-        "openai_base_url": args.openai_base_url or "",
-        "openai_model": args.openai_model or "",
+        "openai_model_name": args.openai_model_name or "",
+        "openrouter_model_name": args.openrouter_model_name or "",
+        "ollama_model_name": args.ollama_model_name or "",
         "output_dir": args.output_dir,
         "verbose": bool(args.verbose),
         "max_urls": args.max_urls,
@@ -434,12 +435,14 @@ def run_interactive(args: argparse.Namespace) -> bool:
             mid_line = "│" + " " * inner_width + "│"
             bottom_border = "╰" + "─" * inner_width + "╯"
 
-            stdscr.addstr(input_row - 1, 0, "Target URL", curses.color_pair(2))
+            if not show_settings:
+                stdscr.addstr(input_row - 1, 0, "Target URL", curses.color_pair(2))
             stdscr.addstr(input_row, box_left, top_border[: max_x - box_left - 1], curses.color_pair(1))
             stdscr.addstr(input_row + 1, box_left, mid_line[: max_x - box_left - 1], curses.color_pair(1))
             stdscr.addstr(input_row + 2, box_left, bottom_border[: max_x - box_left - 1], curses.color_pair(1))
-            url_value = (args.url or "")[: inner_width - 1]
-            stdscr.addstr(input_row + 1, box_left + 1, url_value.ljust(inner_width), curses.color_pair(6))
+            if not show_settings:
+                box_value = (args.url or "")[: inner_width - 1]
+                stdscr.addstr(input_row + 1, box_left + 1, box_value.ljust(inner_width), curses.color_pair(6))
         if hotkey_row < max_y - 2:
             hotkeys = "[Shift+M] Mode  [Shift+D] Discovery  [Enter] Edit URL  [Shift+S] Settings  [Q] Quit"
             stdscr.addstr(hotkey_row, 0, hotkeys[: max_x - 1], curses.color_pair(6))
@@ -449,9 +452,10 @@ def run_interactive(args: argparse.Namespace) -> bool:
             stdscr.addstr(status_row, 0, status_message[: max_x - 1], color)
 
         basic_settings = [
+            ("Model provider", "choice", "openai_provider"),
+            ("Model name", "text", "model_name"),
             ("Mode", "toggle", "mode"),
             ("OpenAI API key", "secret", "openai"),
-            ("LLM provider", "choice", "openai_provider"),
             ("Output base directory", "text", "output"),
             ("Verbose logging", "toggle", "verbose"),
         ]
@@ -536,6 +540,13 @@ def run_interactive(args: argparse.Namespace) -> bool:
                         value = mask_secret(args.openai_api_key)
                 elif key == "openai_provider":
                     value = args.openai_provider
+                elif key == "model_name":
+                    if args.openai_provider == "openrouter":
+                        value = args.openrouter_model_name or "openai/gpt-4.1-nano"
+                    elif args.openai_provider == "ollama":
+                        value = args.ollama_model_name
+                    else:
+                        value = args.openai_model_name or "gpt-4.1-nano"
                 elif key == "output":
                     value = args.output_dir
                 elif key == "verbose":
@@ -576,6 +587,8 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 color = curses.color_pair(3) if is_selected else curses.color_pair(6)
                 if key == "openai" and args.openai_provider == "openrouter":
                     label = "OpenRouter API key"
+                if key == "openai" and args.openai_provider == "ollama":
+                    label = "Ollama (no API key)"
                 stdscr.addstr(row, 0, f"{indicator if is_selected else ' '} {label.ljust(26)} {value}"[: max_x - 1], color)
                 item_positions.append((label, kind_name, key, row))
                 row += 1
@@ -635,10 +648,15 @@ def run_interactive(args: argparse.Namespace) -> bool:
     def edit_value(stdscr, label, kind, key, input_box):
         max_y, max_x = stdscr.getmaxyx()
         input_row, input_col, input_width, hint_row = input_box
-        prompt_row = max(0, input_row - 1)
+        prompt_row = max(0, input_row - 2)
 
         if key == "openai_provider":
-            args.openai_provider = "openrouter" if args.openai_provider == "openai" else "openai"
+            if args.openai_provider == "openai":
+                args.openai_provider = "openrouter"
+            elif args.openai_provider == "openrouter":
+                args.openai_provider = "ollama"
+            else:
+                args.openai_provider = "openai"
             return
 
         hint = ""
@@ -652,7 +670,15 @@ def run_interactive(args: argparse.Namespace) -> bool:
             hint = "Enter value and press Enter"
         if key != "url":
             stdscr.addstr(prompt_row, 0, " " * (max_x - 1))
-            stdscr.addstr(prompt_row, 0, f"{label}:", curses.color_pair(2))
+            label_text = f"{label}:"
+            if key == "openai":
+                if args.openai_provider == "openrouter":
+                    label_text = "OpenRouter API key:"
+                elif args.openai_provider == "ollama":
+                    label_text = "Ollama uses no API key:"
+                else:
+                    label_text = "OpenAI API key:"
+            stdscr.addstr(prompt_row, 0, label_text, curses.color_pair(2))
             stdscr.addstr(hint_row, 0, " " * (max_x - 1))
             stdscr.addstr(hint_row, 0, hint[: max_x - 1], curses.color_pair(6))
         else:
@@ -663,7 +689,17 @@ def run_interactive(args: argparse.Namespace) -> bool:
         if key == "url":
             existing = args.url or ""
         elif key == "openai":
-            existing = args.openai_api_key or ""
+            if args.openai_provider == "openrouter":
+                existing = args.openrouter_api_key or ""
+            else:
+                existing = args.openai_api_key or ""
+        elif key == "model_name":
+            if args.openai_provider == "openrouter":
+                existing = args.openrouter_model_name or "openai/gpt-4.1-nano"
+            elif args.openai_provider == "ollama":
+                existing = args.ollama_model_name or ""
+            else:
+                existing = args.openai_model_name or "gpt-4.1-nano"
         elif key == "output":
             existing = args.output_dir or ""
         elif key == "seed_query":
@@ -741,14 +777,30 @@ def run_interactive(args: argparse.Namespace) -> bool:
             if raw:
                 if args.openai_provider == "openrouter":
                     args.openrouter_api_key = raw
+                elif args.openai_provider == "ollama":
+                    args.openai_api_key = ""
                 else:
                     args.openai_api_key = raw
             return
+        if key == "model_name":
+            if raw:
+                if args.openai_provider == "openrouter":
+                    args.openrouter_model_name = raw
+                elif args.openai_provider == "ollama":
+                    args.ollama_model_name = raw
+                else:
+                    args.openai_model_name = raw
+            return
         if key == "openai_provider":
-            if raw in {"openai", "openrouter"}:
+            if raw in {"openai", "openrouter", "ollama"}:
                 args.openai_provider = raw
             else:
-                args.openai_provider = "openrouter" if args.openai_provider == "openai" else "openai"
+                if args.openai_provider == "openai":
+                    args.openai_provider = "openrouter"
+                elif args.openai_provider == "openrouter":
+                    args.openai_provider = "ollama"
+                else:
+                    args.openai_provider = "openai"
             return
         if key == "url":
             if raw:
@@ -795,17 +847,21 @@ def run_interactive(args: argparse.Namespace) -> bool:
         input_row, _, _, _ = input_box
         prompt_row = min(max_y - 2, input_row + 3)
         stdscr.addstr(prompt_row, 0, " " * (max_x - 1))
-        stdscr.addstr(prompt_row, 0, "Run now? ", curses.color_pair(6))
-        stdscr.addstr(prompt_row, 9, "Yes", curses.color_pair(1))
-        stdscr.addstr(prompt_row, 13, "/", curses.color_pair(6))
-        stdscr.addstr(prompt_row, 15, "No", curses.color_pair(9))
-        stdscr.addstr(prompt_row, 19, "  [Y/N]", curses.color_pair(6))
+        prefix = "Press Enter again to run LLM-ify, press "
+        suffix = " to return"
+        stdscr.addstr(prompt_row, 0, prefix[: max_x - 1], curses.color_pair(1))
+        esc_col = min(len(prefix), max_x - 1)
+        if esc_col < max_x - 1:
+            stdscr.addstr(prompt_row, esc_col, "esc", curses.color_pair(5))
+        suffix_col = esc_col + 3
+        if suffix_col < max_x - 1:
+            stdscr.addstr(prompt_row, suffix_col, suffix[: max_x - 1 - suffix_col], curses.color_pair(1))
         stdscr.refresh()
         while True:
             key = stdscr.getch()
-            if key in (ord("y"), ord("Y")):
+            if key in (10, 13):
                 return True
-            if key in (ord("n"), ord("N"), 27, 10, 13):
+            if key in (27,):
                 return False
     def render_progress(stdscr, message: str, spinner: str) -> None:
         stdscr.clear()
@@ -915,11 +971,12 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 input_row, input_col, input_width, _ = input_box
                 if mouse_state & curses.BUTTON1_CLICKED:
                     if input_row == mouse_y and input_col <= mouse_x < input_col + input_width:
-                        edit_value(stdscr, "Target URL", "text", "url", input_box)
-                        save_config(config_path, collect_config(args))
-                        if args.url and args.openai_api_key and prompt_run_after_url(stdscr, input_box):
-                            ok, msg = run_with_progress(stdscr)
-                            status_message = msg
+                        if not show_settings:
+                            edit_value(stdscr, "Target URL", "text", "url", input_box)
+                            save_config(config_path, collect_config(args))
+                            if args.url and args.openai_api_key and prompt_run_after_url(stdscr, input_box):
+                                ok, msg = run_with_progress(stdscr)
+                                status_message = msg
                         continue
                 if mouse_state & curses.BUTTON4_PRESSED:
                     selected = max(0, selected - 1)
@@ -943,10 +1000,32 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 show_seed = not show_seed
                 selected = 0
             elif key in (curses.KEY_BTAB,):
+                if show_settings and items:
+                    label, kind, key_name, row = items[selected]
+                    if key_name == "openai_provider":
+                        if args.openai_provider == "openai":
+                            args.openai_provider = "openrouter"
+                        elif args.openai_provider == "openrouter":
+                            args.openai_provider = "ollama"
+                        else:
+                            args.openai_provider = "openai"
+                        save_config(config_path, collect_config(args))
+                        continue
                 if not args.single_page:
                     args.discovery_method = cycle_discovery(args.discovery_method, reverse=True)
                     save_config(config_path, collect_config(args))
             elif key in (9,):
+                if show_settings and items:
+                    label, kind, key_name, row = items[selected]
+                    if key_name == "openai_provider":
+                        if args.openai_provider == "openai":
+                            args.openai_provider = "openrouter"
+                        elif args.openai_provider == "openrouter":
+                            args.openai_provider = "ollama"
+                        else:
+                            args.openai_provider = "openai"
+                        save_config(config_path, collect_config(args))
+                        continue
                 if not args.single_page:
                     args.discovery_method = cycle_discovery(args.discovery_method, reverse=False)
                     save_config(config_path, collect_config(args))
@@ -1664,15 +1743,22 @@ Return the response in JSON format:
 def execute_run(args: argparse.Namespace) -> Dict[str, Any]:
     """Execute a crawl run using the provided arguments."""
     if args.openai_provider == "openrouter":
-        if not args.openai_base_url:
-            args.openai_base_url = "https://openrouter.ai/api/v1"
         if not args.openrouter_api_key:
-            args.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
-        if not args.openrouter_api_key:
-            raise ValueError("OpenRouter API key not provided. Set OPENROUTER_API_KEY or use --openrouter-api-key.")
+            raise ValueError("OpenRouter API key not provided. Set it in the TUI settings.")
         args.openai_api_key = args.openrouter_api_key
-    if not args.openai_api_key:
-        raise ValueError("OpenAI/OpenRouter API key not provided. Set OPENAI_API_KEY or use --openai-api-key.")
+        base_url = "https://openrouter.ai/api/v1"
+        model_name = args.openrouter_model_name or "openai/gpt-4.1-nano"
+    elif args.openai_provider == "ollama":
+        base_url = "http://localhost:11434/v1"
+        if not args.ollama_model_name:
+            raise ValueError("Ollama model name not set. Set it in the TUI settings.")
+        model_name = args.ollama_model_name
+        args.openai_api_key = "ollama"
+    else:
+        if not args.openai_api_key:
+            raise ValueError("OpenAI API key not provided. Set it in the TUI settings.")
+        base_url = None
+        model_name = args.openai_model_name or "gpt-4.1-nano"
 
     logger.info("Using crawl4ai crawler")
 
@@ -1689,8 +1775,8 @@ def execute_run(args: argparse.Namespace) -> Dict[str, Any]:
     )
     generator = Crawl4AILLMsTextGenerator(
         args.openai_api_key,
-        model=args.openai_model,
-        base_url=args.openai_base_url,
+        model=model_name,
+        base_url=base_url,
         max_concurrent=args.max_concurrent,
         seeding_options=seeding_options,
         discovery_method=args.discovery_method,
@@ -1773,17 +1859,13 @@ def main():
     config_path = os.path.join(os.getcwd(), "config.json")
     config_defaults = load_config(config_path)
 
-    openrouter_api_key_env = os.getenv("OPENROUTER_API_KEY")
-    openai_api_key_env = os.getenv("OPENAI_API_KEY")
-    openai_base_url_env = os.getenv("OPENAI_BASE_URL")
-    openai_model_env = os.getenv("OPENAI_MODEL", "gpt-4.1-nano")
+    openrouter_api_key_env = None
+    openai_api_key_env = None
+    openai_base_url_env = None
+    openai_model_env = None
     openai_provider_env = os.getenv("OPENAI_PROVIDER")
-    if openrouter_api_key_env and not openai_api_key_env:
-        openai_api_key_env = openrouter_api_key_env
-        if not openai_base_url_env:
-            openai_base_url_env = "https://openrouter.ai/api/v1"
     if not openai_provider_env:
-        openai_provider_env = "openrouter" if openai_base_url_env == "https://openrouter.ai/api/v1" else "openai"
+        openai_provider_env = "openai"
 
     # Seed configuration defaults from environment
     seed_source_default = os.getenv("SEED_SOURCE", "sitemap+cc")
@@ -1822,30 +1904,37 @@ def main():
     parser.add_argument(
         "--openai-api-key",
         default=openai_api_key_env,
-        help="OpenAI/OpenRouter API key (default: OPENAI_API_KEY or OPENROUTER_API_KEY env var)"
+        help="OpenAI API key (default: saved config.json)"
     )
     parser.add_argument(
         "--openrouter-api-key",
         default=openrouter_api_key_env,
-        help="OpenRouter API key (default: OPENROUTER_API_KEY env var)"
+        help="OpenRouter API key (default: saved config.json)"
     )
     parser.add_argument(
         "--provider",
         dest="openai_provider",
         default=openai_provider_env,
-        choices=["openai", "openrouter"],
+        choices=["openai", "openrouter", "ollama"],
         help="LLM provider to use (default: OPENAI_PROVIDER env or inferred)"
     )
     parser.add_argument(
-        "--openai-base-url",
-        default=openai_base_url_env,
-        help="Override OpenAI base URL (default: OPENAI_BASE_URL env var)"
+        "--model",
+        dest="openai_model_name",
+        default="gpt-4.1-nano",
+        help="OpenAI model name (default: gpt-4.1-nano)"
     )
     parser.add_argument(
-        "--model",
-        dest="openai_model",
-        default=openai_model_env,
-        help="Model name to use (default: OPENAI_MODEL env var or gpt-4.1-nano)"
+        "--openrouter-model",
+        dest="openrouter_model_name",
+        default="openai/gpt-4.1-nano",
+        help="OpenRouter model name (default: openai/gpt-4.1-nano)"
+    )
+    parser.add_argument(
+        "--ollama-model",
+        dest="ollama_model_name",
+        default=None,
+        help="Ollama model name (default: set in TUI)"
     )
     parser.add_argument(
         "--no-full-text",
@@ -1974,8 +2063,9 @@ def main():
             "openai_api_key",
             "openrouter_api_key",
             "openai_provider",
-            "openai_base_url",
-            "openai_model",
+            "openai_model_name",
+            "openrouter_model_name",
+            "ollama_model_name",
             "no_full_text",
             "single_page",
             "llms_list_all_urls",
