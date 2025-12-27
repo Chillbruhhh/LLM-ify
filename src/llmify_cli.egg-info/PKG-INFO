@@ -1,18 +1,57 @@
+Metadata-Version: 2.4
+Name: llmify-cli
+Version: 0.1.0
+Summary: LLM-ify: create LLM-ready markdown and text from websites.
+Author: Chillbruhhh
+License: PolyForm Noncommercial License 1.0.0
+        
+        Copyright (c) 2025 Chillbruhhh
+        
+        Acceptance
+        
+        By using this software, you agree to all of the terms and conditions below.
+        
+        Permission is hereby granted to you, free of charge, to use the software,
+        for any purpose other than commercial purposes, subject to the restrictions
+        below, and provided that the following conditions are met.
+        
+        License Restrictions
+        
+        1. Commercial Use Prohibited.
+           You may not use the software for commercial purposes. "Commercial"
+           means any use of the software to generate revenue, including using
+           the software to provide services to third parties, or charging fees
+           for access to the software.
+        
+        2. Notices.
+           You must include this license notice in all copies or substantial
+           portions of the software.
+        
+        Disclaimer of Warranty
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+Project-URL: Homepage, https://github.com/Chillbruhhh/LLM-ify
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: openai>=1.3.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: crawl4ai>=0.7.0
+Requires-Dist: windows-curses>=2.3.0; platform_system == "Windows"
+Dynamic: license-file
+
 ![LLM-ify](Public/assets/llmify.png)
 
 # LLM-ify
 
 LLM-ify generates `llms.txt` and `llms-full.txt` plus full markdown/text captures for single pages or entire websites, so your LLM has clean, readable context.
-
-## Install + Run
-
-```python
-pip install llmify-cli
-```
-
-```bash
-llmify
-```
 
 ## What is llms.txt?
 
@@ -37,11 +76,11 @@ llmify
 
 ## Quick Setup (Recommended)
 
-Other launch commands (all open the TUI):
+Install from PyPI and launch:
 
 ```bash
-llm-ify
-llmify-cli
+pip install llmify-cli
+llmify
 ```
 
 Run the quickstart script for your OS:
