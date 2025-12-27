@@ -7,10 +7,13 @@ import sys
 
 
 def main() -> None:
-    script_path = os.path.join(os.path.dirname(__file__), "src", "generate-llmstxt.py")
     if "--interactive" not in sys.argv:
         sys.argv.insert(1, "--interactive")
-    runpy.run_path(script_path, run_name="__main__")
+    repo_root = os.path.dirname(__file__)
+    src_path = os.path.join(repo_root, "src")
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    runpy.run_module("llmify.generate_llmstxt", run_name="__main__")
 
 
 if __name__ == "__main__":
