@@ -608,10 +608,17 @@ def run_interactive(args: argparse.Namespace) -> bool:
         buffer = list(initial)
         cursor = len(buffer)
         while True:
-            view = "".join(buffer)[:max_len]
+            buffer_str = "".join(buffer)
+            if cursor > len(buffer):
+                cursor = len(buffer)
+            offset = 0
+            if cursor >= max_len:
+                offset = cursor - max_len + 1
+            view = buffer_str[offset:offset + max_len]
             stdscr.addstr(row, col, " " * max_len, color_attr)
             stdscr.addstr(row, col, view, color_attr)
-            stdscr.move(row, col + min(cursor, max_len - 1))
+            cursor_pos = cursor - offset
+            stdscr.move(row, col + max(0, min(cursor_pos, max_len - 1)))
             stdscr.refresh()
             ch = stdscr.getch()
             if ch in (10, 13):  # Enter
@@ -640,7 +647,7 @@ def run_interactive(args: argparse.Namespace) -> bool:
                     buffer.pop(cursor)
                 continue
             if 32 <= ch <= 126:
-                if len(buffer) < max_len:
+                if len(buffer) < 2048:
                     buffer.insert(cursor, chr(ch))
                     cursor += 1
                 continue
@@ -974,9 +981,14 @@ def run_interactive(args: argparse.Namespace) -> bool:
                         if not show_settings:
                             edit_value(stdscr, "Target URL", "text", "url", input_box)
                             save_config(config_path, collect_config(args))
-                            if args.url and args.openai_api_key and prompt_run_after_url(stdscr, input_box):
-                                ok, msg = run_with_progress(stdscr)
-                                status_message = msg
+                            if args.url and (args.openai_api_key or args.openai_provider == "ollama"):
+                                if prompt_run_after_url(stdscr, input_box):
+                                    ok, msg = run_with_progress(stdscr)
+                                    status_message = msg
+                            elif args.url and args.openai_provider == "ollama" and not args.ollama_model_name:
+                                status_message = "Missing Ollama model name. Open Settings to add one."
+                            elif args.url and not args.openai_api_key and args.openai_provider != "ollama":
+                                status_message = "Missing API key. Open Settings to add one."
                         continue
                 if mouse_state & curses.BUTTON4_PRESSED:
                     selected = max(0, selected - 1)
@@ -1033,9 +1045,14 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 if not show_settings:
                     edit_value(stdscr, "Target URL", "text", "url", input_box)
                     save_config(config_path, collect_config(args))
-                    if args.url and args.openai_api_key and prompt_run_after_url(stdscr, input_box):
-                        ok, msg = run_with_progress(stdscr)
-                        status_message = msg
+                    if args.url and (args.openai_api_key or args.openai_provider == "ollama"):
+                        if prompt_run_after_url(stdscr, input_box):
+                            ok, msg = run_with_progress(stdscr)
+                            status_message = msg
+                    elif args.url and args.openai_provider == "ollama" and not args.ollama_model_name:
+                        status_message = "Missing Ollama model name. Open Settings to add one."
+                    elif args.url and not args.openai_api_key and args.openai_provider != "ollama":
+                        status_message = "Missing API key. Open Settings to add one."
                     continue
                 if not items:
                     continue
@@ -1046,20 +1063,30 @@ def run_interactive(args: argparse.Namespace) -> bool:
                     continue
                 edit_value(stdscr, label, kind, key_name, input_box)
                 save_config(config_path, collect_config(args))
-                if key_name in {"url", "openai"} and args.url and args.openai_api_key:
-                    if prompt_run_after_url(stdscr, input_box):
-                        ok, msg = run_with_progress(stdscr)
-                        status_message = msg
+                if key_name in {"url", "openai"}:
+                    if args.url and (args.openai_api_key or args.openai_provider == "ollama"):
+                        if prompt_run_after_url(stdscr, input_box):
+                            ok, msg = run_with_progress(stdscr)
+                            status_message = msg
+                    elif args.url and args.openai_provider == "ollama" and not args.ollama_model_name:
+                        status_message = "Missing Ollama model name. Open Settings to add one."
+                    elif args.url and not args.openai_api_key and args.openai_provider != "ollama":
+                        status_message = "Missing API key. Open Settings to add one."
             elif key in (ord("e"), ord("E")):
                 if not show_settings or not items:
                     continue
                 label, kind, key_name, row = items[selected]
                 edit_value(stdscr, label, kind, key_name, input_box)
                 save_config(config_path, collect_config(args))
-                if key_name in {"url", "openai"} and args.url and args.openai_api_key:
-                    if prompt_run_after_url(stdscr, input_box):
-                        ok, msg = run_with_progress(stdscr)
-                        status_message = msg
+                if key_name in {"url", "openai"}:
+                    if args.url and (args.openai_api_key or args.openai_provider == "ollama"):
+                        if prompt_run_after_url(stdscr, input_box):
+                            ok, msg = run_with_progress(stdscr)
+                            status_message = msg
+                    elif args.url and args.openai_provider == "ollama" and not args.ollama_model_name:
+                        status_message = "Missing Ollama model name. Open Settings to add one."
+                    elif args.url and not args.openai_api_key and args.openai_provider != "ollama":
+                        status_message = "Missing API key. Open Settings to add one."
             elif key in (ord("M"),):
                 args.single_page = not args.single_page
                 selected = 0
