@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "llmify"
+name = "llmify-cli"
 version = "0.1.0"
 description = "LLM-ify: create LLM-ready markdown and text from websites."
 readme = "README.md"
@@ -22,6 +22,7 @@ dependencies = [
 [project.scripts]
 llmify = "llmify.cli:main"
 llm-ify = "llmify.cli:main_tui"
+llmify-cli = "llmify.cli:main_tui"
 
 [project.urls]
 Homepage = "https://github.com/Chillbruhhh/LLM-ify"
