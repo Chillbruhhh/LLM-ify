@@ -1,0 +1,9 @@
+.env
+*.env
+
+old-docs/
+.claude/
+CLAUDE.md
+venv/
+config.json
+collected-texts/

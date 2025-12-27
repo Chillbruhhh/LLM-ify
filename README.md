@@ -1,3 +1,5 @@
+![LLM-ify](Public/assets/llmify.png)
+
 # LLM-ify
 
 LLM-ify generates `llms.txt` and `llms-full.txt` plus full markdown/text captures for single pages or entire websites, so your LLM has clean, readable context.
@@ -40,13 +42,25 @@ git clone https://github.com/Chillbruhhh/LLM-ify.git
 cd LLM-ify
 ```
 
-2. Install dependencies:
+2. Create and activate a virtual environment:
+
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the setup command:
+4. Run the setup command:
 
 ```bash
 crawl4ai-setup
@@ -54,7 +68,7 @@ crawl4ai-setup
 
 This installs browser dependencies needed for Crawl4AI.
 
-4. Set up your OpenAI API key:
+5. Set up your OpenAI API key:
 
    Option A: Using .env file (recommended)
 
@@ -73,6 +87,18 @@ This installs browser dependencies needed for Crawl4AI.
    Option C: Using command line arguments
    (See usage examples below)
 
+### OpenRouter (Optional)
+
+LLM-ify can also use OpenRouter by setting these environment variables:
+
+```bash
+OPENROUTER_API_KEY="your-openrouter-api-key"
+OPENAI_BASE_URL="https://openrouter.ai/api/v1"
+OPENAI_MODEL="openai/gpt-4.1-nano"
+```
+
+If `OPENROUTER_API_KEY` is set and `OPENAI_API_KEY` is empty, LLM-ify will use the OpenRouter key automatically.
+
 ## URL Discovery Methods
 
 When using Crawl4AI, you can choose how to discover URLs:
@@ -82,7 +108,7 @@ When using Crawl4AI, you can choose how to discover URLs:
 Automatically tries the best method - starts with sitemap, merges in link crawling for scoped URLs:
 
 ```bash
-python generate-llmstxt.py https://example.com/docs/
+python src/generate-llmstxt.py https://example.com/docs/
 # Uses auto discovery by default
 ```
 
@@ -94,7 +120,7 @@ Note: seed URLs are deduped using a normalized form that drops query strings/fra
 Fast discovery using the website's sitemap.xml:
 
 ```bash
-python generate-llmstxt.py https://example.com --discovery-method sitemap
+python src/generate-llmstxt.py https://example.com --discovery-method sitemap
 ```
 
 When to use:
@@ -108,10 +134,10 @@ Crawls pages and extracts links, perfect for specific paths:
 
 ```bash
 # Crawl a specific section of a website
-python generate-llmstxt.py https://learn.microsoft.com/en-us/graph/ --discovery-method crawl
+python src/generate-llmstxt.py https://learn.microsoft.com/en-us/graph/ --discovery-method crawl
 
 # Control crawl depth (how many link levels to follow)
-python generate-llmstxt.py https://example.com/docs/ --discovery-method crawl --crawl-depth 2
+python src/generate-llmstxt.py https://example.com/docs/ --discovery-method crawl --crawl-depth 2
 ```
 
 When to use:
@@ -128,18 +154,18 @@ Crawl depth options:
 
 ```bash
 # Crawl only Microsoft Graph API docs (not all of learn.microsoft.com)
-python generate-llmstxt.py https://learn.microsoft.com/en-us/graph/ \
+python src/generate-llmstxt.py https://learn.microsoft.com/en-us/graph/ \
   --discovery-method crawl \
   --crawl-depth 2 \
   --max-urls 50
 
 # Crawl specific documentation section
-python generate-llmstxt.py https://docs.example.com/api/v2/ \
+python src/generate-llmstxt.py https://docs.example.com/api/v2/ \
   --discovery-method crawl \
   --max-urls 100
 
 # Let auto mode decide (recommended)
-python generate-llmstxt.py https://example.com/docs/ \
+python src/generate-llmstxt.py https://example.com/docs/ \
   --max-urls 50
 ```
 
@@ -150,38 +176,38 @@ python generate-llmstxt.py https://example.com/docs/ \
 Generate llms.txt and llms-full.txt for a website:
 
 ```bash
-python generate-llmstxt.py https://example.com
+python src/generate-llmstxt.py https://example.com
 ```
 
 ### With Options
 
 ```bash
 # Limit to 50 URLs
-python generate-llmstxt.py https://example.com --max-urls 50
+python src/generate-llmstxt.py https://example.com --max-urls 50
 
 # Control parallel crawling
-python generate-llmstxt.py https://example.com --max-concurrent 20
+python src/generate-llmstxt.py https://example.com --max-concurrent 20
 
 # Fast crawling with high concurrency
-python generate-llmstxt.py https://example.com --max-urls 100 --max-concurrent 15
+python src/generate-llmstxt.py https://example.com --max-urls 100 --max-concurrent 15
 
 # Save to specific directory
-python generate-llmstxt.py https://example.com --output-dir ./output
+python src/generate-llmstxt.py https://example.com --output-dir ./output
 
 # Only generate llms.txt (skip full text)
-python generate-llmstxt.py https://example.com --no-full-text
+python src/generate-llmstxt.py https://example.com --no-full-text
 
 # Enable verbose logging
-python generate-llmstxt.py https://example.com --verbose
+python src/generate-llmstxt.py https://example.com --verbose
 
 # Specify API key via command line
-python generate-llmstxt.py https://example.com --openai-api-key "sk-..."
+python src/generate-llmstxt.py https://example.com --openai-api-key "sk-..."
 ```
 
 ### Interactive Mode
 
 ```bash
-python generate-llmstxt.py --interactive
+python src/generate-llmstxt.py --interactive
 ```
 
 The interactive UI uses a curses-based full-screen panel with collapsible crawl/seeding sections. Use Tab/Shift+Tab to cycle discovery mode. On Windows, install `windows-curses` if you see a curses import error.
@@ -189,7 +215,7 @@ The interactive UI uses a curses-based full-screen panel with collapsible crawl/
 ### Single Page
 
 ```bash
-python generate-llmstxt.py https://example.com/docs/getting-started --single-page
+python src/generate-llmstxt.py https://example.com/docs/getting-started --single-page
 ```
 
 This writes the page content into `txt-output/<page-title>.txt` and `md-output/<page-title>.md`, with the filename derived from the first markdown heading when available.
@@ -291,41 +317,41 @@ Full markdown content of another page...
 ### Small Website
 
 ```bash
-python generate-llmstxt.py https://small-blog.com --max-urls 20
+python src/generate-llmstxt.py https://small-blog.com --max-urls 20
 ```
 
 ### Specific Documentation Section
 
 ```bash
 # Crawl only the Graph API docs from Microsoft Learn
-python generate-llmstxt.py https://learn.microsoft.com/en-us/graph/ \
+python src/generate-llmstxt.py https://learn.microsoft.com/en-us/graph/ \
   --discovery-method crawl \
   --crawl-depth 2 \
   --max-urls 50 \
   --verbose
 
 # Crawl specific API documentation
-python generate-llmstxt.py https://docs.stripe.com/api/ \
+python src/generate-llmstxt.py https://docs.stripe.com/api/ \
   --max-urls 100
 ```
 
 ### Large Website with Limited Scope
 
 ```bash
-python generate-llmstxt.py https://docs.example.com --max-urls 100 --verbose
+python src/generate-llmstxt.py https://docs.example.com --max-urls 100 --verbose
 ```
 
 ### Quick Index Only
 
 ```bash
-python generate-llmstxt.py https://example.com --no-full-text --max-urls 50
+python src/generate-llmstxt.py https://example.com --no-full-text --max-urls 50
 ```
 
 ### Fast Crawling with High Concurrency
 
 ```bash
 # Crawl multiple pages simultaneously
-python generate-llmstxt.py https://example.com/docs/ \
+python src/generate-llmstxt.py https://example.com/docs/ \
   --max-concurrent 20 \
   --max-urls 200
 ```
