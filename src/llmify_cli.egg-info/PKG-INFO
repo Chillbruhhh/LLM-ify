@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: llmify-cli
-Version: 0.1.3
+Version: 0.1.4
 Summary: LLM-ify: create LLM-ready markdown and text from websites.
 Author: Chillbruhhh
 License: PolyForm Noncommercial License 1.0.0
@@ -61,6 +61,12 @@ pip install llmify-cli
 
 ```bash
 llmify
+```
+
+## Update
+
+```bash
+pip install -U llmify-cli
 ```
 
 ## What is llms.txt?
