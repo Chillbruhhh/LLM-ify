@@ -14,6 +14,12 @@ pip install llmify-cli
 llmify
 ```
 
+## Update
+
+```bash
+pip install -U llmify-cli
+```
+
 ## What is llms.txt?
 
 `llms.txt` is a standardized format for making website content more accessible to Large Language Models (LLMs). It provides:
@@ -173,15 +179,28 @@ Full markdown content of another page...
 
 ## Output Locations
 
-Output files are written under `collected-texts/crawl4ai-<domain>/` by default and split into `txt-output` and `md-output` folders. Example:
+Output files are written under `collected-texts/llmify-<domain>/` by default. Example:
 
 ```
-collected-texts/crawl4ai-docs.example.com/txt-output/llms.txt
-collected-texts/crawl4ai-docs.example.com/txt-output/llms-full.txt
-collected-texts/crawl4ai-docs.example.com/md-output/llms.md
-collected-texts/crawl4ai-docs.example.com/md-output/llms-full.md
-collected-texts/crawl4ai-docs.example.com/seeds.json
+collected-texts/llmify-docs.example.com/GLOSSARY.md
+collected-texts/llmify-docs.example.com/docs/<page-title>.md
+collected-texts/llmify-docs.example.com/llms-files/llms.md
+collected-texts/llmify-docs.example.com/llms-files/llms-full.md
+collected-texts/llmify-docs.example.com/seeds.json
 ```
+
+## Agent Instructions
+
+See `INSTRUCTIONS.md` for guidance on how LLM agents should navigate
+the generated documentation and glossary.
+
+## Contributing
+
+See `CONTRIBUTING.md` for setup, workflow, and PR guidelines.
+
+## Changelog
+
+See `CHANGELOG.md` for release notes.
 
 ## License
 
