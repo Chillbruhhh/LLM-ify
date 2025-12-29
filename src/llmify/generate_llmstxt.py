@@ -113,6 +113,38 @@ def parse_bool_env(value: Optional[str], default: bool) -> bool:
     return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
+def parse_version(value: str) -> Tuple[int, ...]:
+    """Parse a dotted version string into a numeric tuple."""
+    parts = re.findall(r"\d+", value)
+    return tuple(int(part) for part in parts) if parts else (0,)
+
+
+def check_for_updates(current_version: str, package_name: str = "llmify-cli") -> Optional[str]:
+    """Return an update message if a newer version is available."""
+    if parse_bool_env(os.getenv("LLMIFY_DISABLE_UPDATE_CHECK"), False):
+        return None
+    try:
+        from urllib.request import urlopen
+        from urllib.error import URLError
+    except Exception:
+        return None
+
+    url = f"https://pypi.org/pypi/{package_name}/json"
+    try:
+        with urlopen(url, timeout=2) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+
+    latest = (data.get("info") or {}).get("version")
+    if not latest:
+        return None
+
+    if parse_version(latest) > parse_version(current_version):
+        return f"Update available: {latest}. Run: pip install -U {package_name}"
+    return None
+
+
 def split_patterns(value: Optional[str]) -> List[str]:
     """Split a comma-delimited pattern string into a list."""
     if not value:
@@ -135,6 +167,135 @@ def extract_markdown_title(markdown: str) -> Optional[str]:
             title = match.group(1).strip()
             return title or None
     return None
+
+
+SCOPE_ORDER = [
+    "all",
+    "docs",
+    "llms.txt",
+    "llms-full.txt",
+    "llms.txt+llms-full.txt",
+]
+SCOPE_LABELS = {
+    "all": "all",
+    "docs": "docs",
+    "llms.txt": "llms.txt",
+    "llms-full.txt": "llms-full.txt",
+    "llms.txt+llms-full.txt": "llms.txt + llms-full.txt",
+}
+
+
+def normalize_scope(value: Optional[str]) -> str:
+    """Return a supported scope value."""
+    if value in SCOPE_ORDER:
+        return value
+    return "all"
+
+
+def scope_label(value: Optional[str]) -> str:
+    """Return a display label for the scope value."""
+    return SCOPE_LABELS.get(normalize_scope(value), "all")
+
+
+def cycle_scope(current: Optional[str], reverse: bool = False) -> str:
+    """Cycle through available output scopes."""
+    order = SCOPE_ORDER
+    current_value = normalize_scope(current)
+    idx = order.index(current_value)
+    delta = -1 if reverse else 1
+    return order[(idx + delta) % len(order)]
+
+
+def resolve_scope_flags(scope: Optional[str], allow_full_text: bool) -> Dict[str, bool]:
+    """Return output flags based on the selected scope."""
+    scope_value = normalize_scope(scope)
+    if scope_value == "docs":
+        return {"write_llms": False, "write_full": False, "write_docs": True}
+    if scope_value == "llms.txt":
+        return {"write_llms": True, "write_full": False, "write_docs": False}
+    if scope_value == "llms-full.txt":
+        return {"write_llms": False, "write_full": True, "write_docs": False}
+    if scope_value == "llms.txt+llms-full.txt":
+        return {"write_llms": True, "write_full": True, "write_docs": False}
+    return {"write_llms": True, "write_full": allow_full_text, "write_docs": True}
+
+
+LLMS_OUTPUT_ORDER = ["md", "txt", "both"]
+LLMS_OUTPUT_LABELS = {"md": "markdown", "txt": "text", "both": "both"}
+
+
+def normalize_llms_output(value: Optional[str]) -> str:
+    """Return a supported llms output format."""
+    if value in LLMS_OUTPUT_ORDER:
+        return value
+    return "md"
+
+
+def llms_output_label(value: Optional[str]) -> str:
+    """Return a display label for the llms output format."""
+    return LLMS_OUTPUT_LABELS.get(normalize_llms_output(value), "markdown")
+
+
+def cycle_llms_output(current: Optional[str], reverse: bool = False) -> str:
+    """Cycle through llms output formats."""
+    current_value = normalize_llms_output(current)
+    idx = LLMS_OUTPUT_ORDER.index(current_value)
+    delta = -1 if reverse else 1
+    return LLMS_OUTPUT_ORDER[(idx + delta) % len(LLMS_OUTPUT_ORDER)]
+
+
+def write_docs_pages(pages: List[Dict[str, Any]], docs_output_dir: str) -> List[Dict[str, str]]:
+    """Write per-page markdown files under docs_output_dir and return glossary entries."""
+    os.makedirs(docs_output_dir, exist_ok=True)
+    filename_counts: Dict[str, int] = {}
+    entries: List[Dict[str, str]] = []
+
+    for page in pages:
+        page_title = page.get("title") or "Page"
+        base_slug = sanitize_folder_name(page_title) or "page"
+        count = filename_counts.get(base_slug, 0)
+        filename_counts[base_slug] = count + 1
+        suffix = f"-{count + 1}" if count else ""
+        filename = f"{base_slug}{suffix}.md"
+        page_path = os.path.join(docs_output_dir, filename)
+        markdown = (page.get("markdown") or "").strip()
+        if not markdown:
+            continue
+        if not markdown.lstrip().startswith("#"):
+            markdown = f"# {page_title}\n\n{markdown}"
+        with open(page_path, "w", encoding="utf-8") as f:
+            f.write(markdown + "\n")
+        entries.append(
+            {
+                "filename": filename,
+                "title": page_title,
+                "description": page.get("description") or "",
+                "url": page.get("url") or "",
+            }
+        )
+
+    return entries
+
+
+def write_docs_glossary(entries: List[Dict[str, str]], output_dir: str, site_url: str) -> str:
+    """Write a glossary of generated doc pages."""
+    glossary_path = os.path.join(output_dir, "GLOSSARY.md")
+    lines = [f"# {site_url} docs glossary", ""]
+    for entry in entries:
+        description = entry["description"].strip()
+        if entry["url"]:
+            label = f"[{entry['title']}]({entry['url']})"
+        else:
+            label = entry["title"]
+        file_ref = f"`docs/{entry['filename']}`"
+        if description:
+            lines.append(f"- {label} ({file_ref}): {description}")
+        else:
+            lines.append(f"- {label} ({file_ref})")
+    lines.append("")
+    with open(glossary_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    return glossary_path
 
 
 def url_dedupe_key(url: str) -> str:
@@ -333,6 +494,8 @@ def collect_config(args: argparse.Namespace) -> Dict[str, Any]:
     """Collect configurable settings for persistence."""
     return {
         "single_page": bool(args.single_page),
+        "scope": normalize_scope(getattr(args, "scope", None)),
+        "llms_output": normalize_llms_output(getattr(args, "llms_output", None)),
         "openai_api_key": args.openai_api_key or "",
         "openrouter_api_key": args.openrouter_api_key or "",
         "openai_provider": args.openai_provider,
@@ -363,6 +526,12 @@ def run_interactive(args: argparse.Namespace) -> bool:
     """Interactive CLI flow for configuring a run using curses."""
     args.openai_api_key = args.openai_api_key or os.getenv("OPENAI_API_KEY", "")
     config_path = os.path.join(os.getcwd(), "config.json")
+    update_message = None
+    try:
+        from llmify import __version__ as current_version
+        update_message = check_for_updates(current_version)
+    except Exception:
+        update_message = None
 
     try:
         import curses
@@ -416,9 +585,15 @@ def run_interactive(args: argparse.Namespace) -> bool:
 
         mode_label = "Single page" if args.single_page else "Full website"
         discovery_label = args.discovery_method if not args.single_page else "-"
+        scope_value = scope_label(args.scope) if not args.single_page else "-"
         seed_score_label = "" if args.seed_score_threshold is None else str(args.seed_score_threshold)
 
-        stdscr.addstr(header_y + 3, 0, f"Mode: {mode_label}  |  Discovery: {discovery_label}", curses.color_pair(6))
+        stdscr.addstr(
+            header_y + 3,
+            0,
+            f"Mode: {mode_label}  |  Discovery: {discovery_label}  |  Scope: {scope_value}",
+            curses.color_pair(6),
+        )
 
         input_label_row = header_y + 5
         input_row = header_y + 6
@@ -444,7 +619,10 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 box_value = (args.url or "")[: inner_width - 1]
                 stdscr.addstr(input_row + 1, box_left + 1, box_value.ljust(inner_width), curses.color_pair(6))
         if hotkey_row < max_y - 2:
-            hotkeys = "[Shift+M] Mode  [Shift+D] Discovery  [Enter] Edit URL  [Shift+S] Settings  [Q] Quit"
+            if args.single_page:
+                hotkeys = "[Shift+M] Mode  [Enter] Edit URL  [Shift+S] Settings  [Q] Quit"
+            else:
+                hotkeys = "[Shift+M] Mode  [Shift+D] Discovery  [Shift+Tab] Scope  [Enter] Edit URL  [Shift+S] Settings  [Q] Quit"
             stdscr.addstr(hotkey_row, 0, hotkeys[: max_x - 1], curses.color_pair(6))
         status_row = hotkey_row + 1
         if status_message and status_row < max_y - 2:
@@ -457,6 +635,7 @@ def run_interactive(args: argparse.Namespace) -> bool:
             ("Mode", "toggle", "mode"),
             ("OpenAI API key", "secret", "openai"),
             ("Output base directory", "text", "output"),
+            ("LLMS output format", "choice", "llms_output"),
             ("Verbose logging", "toggle", "verbose"),
         ]
         crawl_settings = [
@@ -549,6 +728,8 @@ def run_interactive(args: argparse.Namespace) -> bool:
                         value = args.openai_model_name or "gpt-4.1-nano"
                 elif key == "output":
                     value = args.output_dir
+                elif key == "llms_output":
+                    value = llms_output_label(args.llms_output)
                 elif key == "verbose":
                     value = "on" if args.verbose else "off"
                 elif key == "max_urls":
@@ -593,11 +774,11 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 item_positions.append((label, kind_name, key, row))
                 row += 1
 
-        action_bar = "Actions: [Enter] Edit | [Shift+M] Mode | [Shift+D] Discovery | [Shift+S] Settings | [Q] Quit"
+        action_bar = "Actions: [Enter] Edit | [Shift+M] Mode | [Shift+D] Discovery | [Shift+Tab] Scope | [Shift+S] Settings | [Q] Quit"
         if args.single_page:
             action_bar = "Actions: [Enter] Edit | [Shift+M] Mode | [Q] Quit"
         if show_settings and not args.single_page:
-            action_bar = "Actions: [Enter] Edit | [Shift+M] Mode | [Shift+D] Discovery | [Shift+S] Settings | [C] Crawl | [s] Seed | [Q] Quit"
+            action_bar = "Actions: [Enter] Edit | [Shift+M] Mode | [Shift+D] Discovery | [Shift+Tab] Scope | [Shift+S] Settings | [C] Crawl | [s] Seed | [Q] Quit"
         stdscr.addstr(max_y - 2, 0, action_bar[: max_x - 1], curses.color_pair(2))
         stdscr.addstr(max_y - 1, 0, "Enter a URL or use arrows to select a setting.", curses.color_pair(6))
         stdscr.refresh()
@@ -665,12 +846,17 @@ def run_interactive(args: argparse.Namespace) -> bool:
             else:
                 args.openai_provider = "openai"
             return
+        if key == "llms_output":
+            args.llms_output = cycle_llms_output(args.llms_output)
+            return
 
         hint = ""
         if key == "mode":
             hint = "Toggle mode: Full website <-> Single page"
         elif key == "discovery_method":
-            hint = "Toggle discovery: auto <-> sitemap <-> crawl (Tab/Shift+Tab)"
+            hint = "Toggle discovery: auto <-> sitemap <-> crawl (Shift+D or Tab)"
+        elif key == "llms_output":
+            hint = "Toggle output: markdown <-> text <-> both"
         elif kind == "toggle":
             hint = "Toggle on/off with Enter"
         else:
@@ -739,6 +925,8 @@ def run_interactive(args: argparse.Namespace) -> bool:
             existing = "on" if args.verbose else "off"
         elif key == "seed_source":
             existing = args.seed_source or ""
+        elif key == "llms_output":
+            existing = args.llms_output or ""
 
         max_len = min(input_width - 1, max_x - input_col - 1)
         prev_mask = curses.mousemask(0)
@@ -779,6 +967,12 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 args.discovery_method = raw
             else:
                 args.discovery_method = cycle_discovery(args.discovery_method)
+            return
+        if key == "llms_output":
+            if raw in {"md", "txt", "both"}:
+                args.llms_output = raw
+            else:
+                args.llms_output = cycle_llms_output(args.llms_output)
             return
         if key == "openai":
             if raw:
@@ -948,8 +1142,7 @@ def run_interactive(args: argparse.Namespace) -> bool:
         show_settings = False
         show_crawl = False
         show_seed = False
-        first_focus = True
-        status_message = ""
+        status_message = update_message or ""
         while True:
             items, layout_row, input_box = draw_screen(
                 stdscr,
@@ -959,10 +1152,6 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 show_seed,
                 status_message,
             )
-            if first_focus:
-                edit_value(stdscr, "Target URL", "text", "url", input_box)
-                save_config(config_path, collect_config(args))
-                first_focus = False
             if items:
                 selected = max(0, min(selected, len(items) - 1))
             else:
@@ -1011,20 +1200,9 @@ def run_interactive(args: argparse.Namespace) -> bool:
             elif key in (ord("s"),) and show_settings and not args.single_page:
                 show_seed = not show_seed
                 selected = 0
-            elif key in (curses.KEY_BTAB,):
-                if show_settings and items:
-                    label, kind, key_name, row = items[selected]
-                    if key_name == "openai_provider":
-                        if args.openai_provider == "openai":
-                            args.openai_provider = "openrouter"
-                        elif args.openai_provider == "openrouter":
-                            args.openai_provider = "ollama"
-                        else:
-                            args.openai_provider = "openai"
-                        save_config(config_path, collect_config(args))
-                        continue
+            elif key in (curses.KEY_BTAB, 353):
                 if not args.single_page:
-                    args.discovery_method = cycle_discovery(args.discovery_method, reverse=True)
+                    args.scope = cycle_scope(args.scope, reverse=True)
                     save_config(config_path, collect_config(args))
             elif key in (9,):
                 if show_settings and items:
@@ -1621,7 +1799,7 @@ Return the response in JSON format:
         max_urls: Optional[int] = None,
         show_full_text: bool = True,
         list_all_urls: bool = False,
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """Generate llms.txt and llms-full.txt for a website (async version with parallel processing)."""
         logger.info(f"Generating llms.txt for {url}")
 
@@ -1729,6 +1907,7 @@ Return the response in JSON format:
         return {
             "llmstxt": llmstxt,
             "llms_fulltxt": llms_fulltxt,
+            "pages": deduped_results,
             "num_urls_processed": len(all_results),
             "num_urls_written": len(deduped_results),
             "num_urls_total": len(urls),
@@ -1742,7 +1921,7 @@ Return the response in JSON format:
         max_urls: Optional[int] = None,
         show_full_text: bool = True,
         list_all_urls: bool = False,
-    ) -> Dict[str, str]:
+    ) -> Dict[str, Any]:
         """Synchronous wrapper for generate_llmstxt_async."""
         return asyncio.run(self.generate_llmstxt_async(url, max_urls, show_full_text, list_all_urls))
 
@@ -1813,25 +1992,25 @@ def execute_run(args: argparse.Namespace) -> Dict[str, Any]:
     from urllib.parse import urlparse
 
     domain = urlparse(args.url).netloc.replace("www.", "")
-    service_name = "crawl4ai"
+    service_name = "llmify"
     domain_name = sanitize_folder_name(domain)
     output_dir = os.path.join(args.output_dir, f"{service_name}-{domain_name}")
     os.makedirs(output_dir, exist_ok=True)
 
-    txt_output_dir = os.path.join(output_dir, "txt-output")
-    md_output_dir = os.path.join(output_dir, "md-output")
-    os.makedirs(txt_output_dir, exist_ok=True)
-    os.makedirs(md_output_dir, exist_ok=True)
-
     if args.single_page:
+        llms_output_dir = os.path.join(output_dir, "llms-files")
+        os.makedirs(llms_output_dir, exist_ok=True)
         single_result = generator.generate_single_page(args.url)
         title_slug = sanitize_folder_name(single_result["title"])
-        txt_single_path = os.path.join(txt_output_dir, f"{title_slug}.txt")
-        with open(txt_single_path, "w", encoding="utf-8") as f:
-            f.write(single_result["markdown"])
-        md_single_path = os.path.join(md_output_dir, f"{title_slug}.md")
-        with open(md_single_path, "w", encoding="utf-8") as f:
-            f.write(single_result["markdown"])
+        single_markdown = single_result["markdown"]
+        if args.llms_output in {"txt", "both"}:
+            txt_single_path = os.path.join(llms_output_dir, f"{title_slug}.txt")
+            with open(txt_single_path, "w", encoding="utf-8") as f:
+                f.write(single_markdown)
+        if args.llms_output in {"md", "both"}:
+            md_single_path = os.path.join(llms_output_dir, f"{title_slug}.md")
+            with open(md_single_path, "w", encoding="utf-8") as f:
+                f.write(single_markdown)
         return {
             "mode": "single",
             "output_dir": output_dir,
@@ -1845,22 +2024,37 @@ def execute_run(args: argparse.Namespace) -> Dict[str, Any]:
         args.llms_list_all_urls,
     )
 
-    llmstxt_path = os.path.join(txt_output_dir, "llms.txt")
-    with open(llmstxt_path, "w", encoding="utf-8") as f:
-        f.write(result["llmstxt"])
+    scope_flags = resolve_scope_flags(args.scope, not args.no_full_text)
+    if scope_flags["write_llms"]:
+        llms_output_dir = os.path.join(output_dir, "llms-files")
+        os.makedirs(llms_output_dir, exist_ok=True)
+        if args.llms_output in {"txt", "both"}:
+            llmstxt_path = os.path.join(llms_output_dir, "llms.txt")
+            with open(llmstxt_path, "w", encoding="utf-8") as f:
+                f.write(result["llmstxt"])
+        if args.llms_output in {"md", "both"}:
+            llmstxt_md_path = os.path.join(llms_output_dir, "llms.md")
+            with open(llmstxt_md_path, "w", encoding="utf-8") as f:
+                f.write(result["llmstxt"])
 
-    llmstxt_md_path = os.path.join(md_output_dir, "llms.md")
-    with open(llmstxt_md_path, "w", encoding="utf-8") as f:
-        f.write(result["llmstxt"])
+    if scope_flags["write_full"]:
+        llms_output_dir = os.path.join(output_dir, "llms-files")
+        os.makedirs(llms_output_dir, exist_ok=True)
+        if args.llms_output in {"txt", "both"}:
+            llms_fulltxt_path = os.path.join(llms_output_dir, "llms-full.txt")
+            with open(llms_fulltxt_path, "w", encoding="utf-8") as f:
+                f.write(result["llms_fulltxt"])
+        if args.llms_output in {"md", "both"}:
+            llms_full_md_path = os.path.join(llms_output_dir, "llms-full.md")
+            with open(llms_full_md_path, "w", encoding="utf-8") as f:
+                f.write(result["llms_fulltxt"])
 
-    if not args.no_full_text:
-        llms_fulltxt_path = os.path.join(txt_output_dir, "llms-full.txt")
-        with open(llms_fulltxt_path, "w", encoding="utf-8") as f:
-            f.write(result["llms_fulltxt"])
-
-        llms_full_md_path = os.path.join(md_output_dir, "llms-full.md")
-        with open(llms_full_md_path, "w", encoding="utf-8") as f:
-            f.write(result["llms_fulltxt"])
+    if scope_flags["write_docs"]:
+        docs_output_dir = os.path.join(output_dir, "docs")
+        pages = result.get("pages") or []
+        if pages:
+            entries = write_docs_pages(pages, docs_output_dir)
+            write_docs_glossary(entries, output_dir, args.url)
 
     seed_inventory = result.get("seed_inventory") or []
     if seed_inventory:
@@ -1972,6 +2166,19 @@ def main():
         "--single-page",
         action="store_true",
         help="Scrape a single page only and save it as a standalone file"
+    )
+    parser.add_argument(
+        "--scope",
+        default="all",
+        choices=SCOPE_ORDER,
+        help="Output scope: all, docs, llms.txt, llms-full.txt, llms.txt+llms-full.txt (default: all)"
+    )
+    parser.add_argument(
+        "--llms-output",
+        dest="llms_output",
+        default="md",
+        choices=LLMS_OUTPUT_ORDER,
+        help="LLMS file format: md, txt, or both (default: md)"
     )
     parser.add_argument(
         "--llms-list-all-urls",
@@ -2095,6 +2302,8 @@ def main():
             "ollama_model_name",
             "no_full_text",
             "single_page",
+            "scope",
+            "llms_output",
             "llms_list_all_urls",
             "verbose",
             "max_concurrent",
@@ -2117,6 +2326,8 @@ def main():
             parser.set_defaults(**defaults_payload)
 
     args = parser.parse_args()
+    args.scope = normalize_scope(getattr(args, "scope", None))
+    args.llms_output = normalize_llms_output(getattr(args, "llms_output", None))
 
     if args.interactive:
         try:
@@ -2129,6 +2340,14 @@ def main():
 
     if not args.url:
         parser.error("url is required unless --interactive is used")
+
+    try:
+        from llmify import __version__ as current_version
+        update_message = check_for_updates(current_version)
+        if update_message:
+            logger.info(update_message)
+    except Exception:
+        pass
 
     # Merge CLI and environment pattern filters
     def merge_patterns(cli_patterns: Optional[List[str]], env_patterns: List[str]) -> List[str]:
@@ -2180,30 +2399,30 @@ def main():
         from urllib.parse import urlparse
         domain = urlparse(args.url).netloc.replace("www.", "")
 
-        service_name = "crawl4ai"
+        service_name = "llmify"
         domain_name = sanitize_folder_name(domain)
         output_dir = os.path.join(args.output_dir, f"{service_name}-{domain_name}")
 
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
 
-        txt_output_dir = os.path.join(output_dir, "txt-output")
-        md_output_dir = os.path.join(output_dir, "md-output")
-        os.makedirs(txt_output_dir, exist_ok=True)
-        os.makedirs(md_output_dir, exist_ok=True)
-
         if args.single_page:
+            llms_output_dir = os.path.join(output_dir, "llms-files")
+            os.makedirs(llms_output_dir, exist_ok=True)
             single_result = generator.generate_single_page(args.url)
             title_slug = sanitize_folder_name(single_result["title"])
-            txt_single_path = os.path.join(txt_output_dir, f"{title_slug}.txt")
-            with open(txt_single_path, "w", encoding="utf-8") as f:
-                f.write(single_result["markdown"])
-            logger.info(f"Saved single-page txt to {txt_single_path}")
+            single_markdown = single_result["markdown"]
+            if args.llms_output in {"txt", "both"}:
+                txt_single_path = os.path.join(llms_output_dir, f"{title_slug}.txt")
+                with open(txt_single_path, "w", encoding="utf-8") as f:
+                    f.write(single_markdown)
+                logger.info(f"Saved single-page txt to {txt_single_path}")
 
-            md_single_path = os.path.join(md_output_dir, f"{title_slug}.md")
-            with open(md_single_path, "w", encoding="utf-8") as f:
-                f.write(single_result["markdown"])
-            logger.info(f"Saved single-page markdown to {md_single_path}")
+            if args.llms_output in {"md", "both"}:
+                md_single_path = os.path.join(llms_output_dir, f"{title_slug}.md")
+                with open(md_single_path, "w", encoding="utf-8") as f:
+                    f.write(single_markdown)
+                logger.info(f"Saved single-page markdown to {md_single_path}")
 
             print(f"\nSuccess! Scraped single page: {args.url}")
             print(f"Files saved to {output_dir}/")
@@ -2217,27 +2436,46 @@ def main():
             )
 
             # Save llms.txt
-            llmstxt_path = os.path.join(txt_output_dir, "llms.txt")
-            with open(llmstxt_path, "w", encoding="utf-8") as f:
-                f.write(result["llmstxt"])
-            logger.info(f"Saved llms.txt to {llmstxt_path}")
+            scope_flags = resolve_scope_flags(args.scope, not args.no_full_text)
+            if scope_flags["write_llms"]:
+                llms_output_dir = os.path.join(output_dir, "llms-files")
+                os.makedirs(llms_output_dir, exist_ok=True)
+                if args.llms_output in {"txt", "both"}:
+                    llmstxt_path = os.path.join(llms_output_dir, "llms.txt")
+                    with open(llmstxt_path, "w", encoding="utf-8") as f:
+                        f.write(result["llmstxt"])
+                    logger.info(f"Saved llms.txt to {llmstxt_path}")
 
-            llmstxt_md_path = os.path.join(md_output_dir, "llms.md")
-            with open(llmstxt_md_path, "w", encoding="utf-8") as f:
-                f.write(result["llmstxt"])
-            logger.info(f"Saved llms.md to {llmstxt_md_path}")
+                if args.llms_output in {"md", "both"}:
+                    llmstxt_md_path = os.path.join(llms_output_dir, "llms.md")
+                    with open(llmstxt_md_path, "w", encoding="utf-8") as f:
+                        f.write(result["llmstxt"])
+                    logger.info(f"Saved llms.md to {llmstxt_md_path}")
 
             # Save llms-full.txt if requested
-            if not args.no_full_text:
-                llms_fulltxt_path = os.path.join(txt_output_dir, "llms-full.txt")
-                with open(llms_fulltxt_path, "w", encoding="utf-8") as f:
-                    f.write(result["llms_fulltxt"])
-                logger.info(f"Saved llms-full.txt to {llms_fulltxt_path}")
+            if scope_flags["write_full"]:
+                llms_output_dir = os.path.join(output_dir, "llms-files")
+                os.makedirs(llms_output_dir, exist_ok=True)
+                if args.llms_output in {"txt", "both"}:
+                    llms_fulltxt_path = os.path.join(llms_output_dir, "llms-full.txt")
+                    with open(llms_fulltxt_path, "w", encoding="utf-8") as f:
+                        f.write(result["llms_fulltxt"])
+                    logger.info(f"Saved llms-full.txt to {llms_fulltxt_path}")
 
-                llms_full_md_path = os.path.join(md_output_dir, "llms-full.md")
-                with open(llms_full_md_path, "w", encoding="utf-8") as f:
-                    f.write(result["llms_fulltxt"])
-                logger.info(f"Saved llms-full.md to {llms_full_md_path}")
+                if args.llms_output in {"md", "both"}:
+                    llms_full_md_path = os.path.join(llms_output_dir, "llms-full.md")
+                    with open(llms_full_md_path, "w", encoding="utf-8") as f:
+                        f.write(result["llms_fulltxt"])
+                    logger.info(f"Saved llms-full.md to {llms_full_md_path}")
+
+            if scope_flags["write_docs"]:
+                docs_output_dir = os.path.join(output_dir, "docs")
+                pages = result.get("pages") or []
+                if pages:
+                    entries = write_docs_pages(pages, docs_output_dir)
+                    glossary_path = write_docs_glossary(entries, output_dir, args.url)
+                    logger.info("Saved %s docs pages to %s", len(entries), docs_output_dir)
+                    logger.info("Saved docs glossary to %s", glossary_path)
 
             # Persist seed inventory when available
             seed_inventory = result.get("seed_inventory") or []
