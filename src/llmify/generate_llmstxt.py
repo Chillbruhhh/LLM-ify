@@ -17,6 +17,8 @@ import logging
 import re
 import asyncio
 import hashlib
+import shutil
+import shutil
 import threading
 import time
 import traceback
@@ -112,7 +114,6 @@ def parse_bool_env(value: Optional[str], default: bool) -> bool:
         return default
     return value.strip().lower() not in {"0", "false", "no", "off"}
 
-
 def parse_version(value: str) -> Tuple[int, ...]:
     """Parse a dotted version string into a numeric tuple."""
     parts = re.findall(r"\d+", value)
@@ -142,6 +143,16 @@ def check_for_updates(current_version: str, package_name: str = "llmify-cli") ->
 
     if parse_version(latest) > parse_version(current_version):
         return f"Update available: {latest}. Run: pip install -U {package_name}"
+def crawl4ai_setup_warning() -> Optional[str]:
+    """Return a warning if Crawl4AI setup is missing."""
+    if parse_bool_env(os.getenv("LLMIFY_FORCE_SETUP_WARNING"), False):
+        return "LLM-ify isn't configured properly yet. Run: pip install llmify-cli && llmify setup"
+    if shutil.which("crawl4ai-setup") is None:
+        return "LLM-ify isn't configured properly yet. Run: pip install llmify-cli && llmify setup"
+    try:
+        import crawl4ai  # noqa: F401
+    except Exception:
+        return "LLM-ify isn't configured properly yet. Run: pip install llmify-cli && llmify setup"
     return None
 
 
@@ -774,12 +785,6 @@ def run_interactive(args: argparse.Namespace) -> bool:
                 item_positions.append((label, kind_name, key, row))
                 row += 1
 
-        action_bar = "Actions: [Enter] Edit | [Shift+M] Mode | [Shift+D] Discovery | [Shift+Tab] Scope | [Shift+S] Settings | [Q] Quit"
-        if args.single_page:
-            action_bar = "Actions: [Enter] Edit | [Shift+M] Mode | [Q] Quit"
-        if show_settings and not args.single_page:
-            action_bar = "Actions: [Enter] Edit | [Shift+M] Mode | [Shift+D] Discovery | [Shift+Tab] Scope | [Shift+S] Settings | [C] Crawl | [s] Seed | [Q] Quit"
-        stdscr.addstr(max_y - 2, 0, action_bar[: max_x - 1], curses.color_pair(2))
         stdscr.addstr(max_y - 1, 0, "Enter a URL or use arrows to select a setting.", curses.color_pair(6))
         stdscr.refresh()
         return item_positions, row, (input_row + 1, box_left + 1, box_width - 2, hotkey_row)
@@ -1142,7 +1147,7 @@ def run_interactive(args: argparse.Namespace) -> bool:
         show_settings = False
         show_crawl = False
         show_seed = False
-        status_message = update_message or ""
+        status_message = update_message or crawl4ai_setup_warning() or ""
         while True:
             items, layout_row, input_box = draw_screen(
                 stdscr,
@@ -2348,6 +2353,9 @@ def main():
             logger.info(update_message)
     except Exception:
         pass
+    setup_warning = crawl4ai_setup_warning()
+    if setup_warning:
+        logger.warning(setup_warning)
 
     # Merge CLI and environment pattern filters
     def merge_patterns(cli_patterns: Optional[List[str]], env_patterns: List[str]) -> List[str]:

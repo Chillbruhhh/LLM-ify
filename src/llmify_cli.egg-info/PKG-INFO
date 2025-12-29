@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: llmify-cli
-Version: 0.1.4
+Version: 0.1.5
 Summary: LLM-ify: create LLM-ready markdown and text from websites.
 Author: Chillbruhhh
 License: PolyForm Noncommercial License 1.0.0
@@ -63,6 +63,12 @@ pip install llmify-cli
 llmify
 ```
 
+Run LLM-ify setup (after install):
+
+```bash
+llmify setup
+```
+
 ## Update
 
 ```bash
@@ -88,7 +94,7 @@ pip install -U llmify-cli
 
 - Python 3.7+
 - OpenAI API key ([Get one here](https://platform.openai.com))
-- Crawl4AI setup (see installation)
+- Crawl4AI browser dependencies (run `llmify setup` after install)
 
 ## Quick Setup (Recommended)
 
@@ -237,6 +243,19 @@ collected-texts/llmify-docs.example.com/llms-files/llms.md
 collected-texts/llmify-docs.example.com/llms-files/llms-full.md
 collected-texts/llmify-docs.example.com/seeds.json
 ```
+
+## Agent Instructions
+
+See `INSTRUCTIONS.md` for guidance on how LLM agents should navigate
+the generated documentation and glossary.
+
+## Contributing
+
+See `CONTRIBUTING.md` for setup, workflow, and PR guidelines.
+
+## Changelog
+
+See `CHANGELOG.md` for release notes.
 
 ## License
 

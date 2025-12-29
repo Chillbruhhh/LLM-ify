@@ -14,6 +14,12 @@ pip install llmify-cli
 llmify
 ```
 
+Run LLM-ify setup (after install):
+
+```bash
+llmify setup
+```
+
 ## Update
 
 ```bash
@@ -39,7 +45,7 @@ pip install -U llmify-cli
 
 - Python 3.7+
 - OpenAI API key ([Get one here](https://platform.openai.com))
-- Crawl4AI setup (see installation)
+- Crawl4AI browser dependencies (run `llmify setup` after install)
 
 ## Quick Setup (Recommended)
 
