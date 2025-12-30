@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: llmify-cli
-Version: 0.1.5
+Version: 0.1.6
 Summary: LLM-ify: create LLM-ready markdown and text from websites.
 Author: Chillbruhhh
 License: PolyForm Noncommercial License 1.0.0
@@ -51,9 +51,9 @@ Dynamic: license-file
 
 # LLM-ify
 
-LLM-ify generates `llms.txt` and `llms-full.txt` plus full markdown/text captures for single pages or entire websites, so your LLM has clean, readable context.
+LLM-ify turns any website documentation into local, readable docs in seconds. It also generates `llms.txt` and `llms-full.txt` plus full markdown/text captures for single pages or entire sites, so your LLM has clean, structured context.
 
-## Install + Run
+## Install + Run (Recommended)
 
 ```python
 pip install llmify-cli
@@ -63,7 +63,7 @@ pip install llmify-cli
 llmify
 ```
 
-Run LLM-ify setup (after install):
+Run Crawl4AI setup (after install):
 
 ```bash
 llmify setup
@@ -84,9 +84,10 @@ pip install -U llmify-cli
 
 ## Features
 
+- Turn documentation websites into local, searchable markdown
 - Full website or single-page capture
-- Text + Markdown output
 - LLM-friendly index (`llms.txt`) + full corpus (`llms-full.txt`)
+- Per-page doc files + glossary for fast navigation
 - OpenAI or OpenRouter support
 - Interactive terminal UI
 
@@ -96,69 +97,28 @@ pip install -U llmify-cli
 - OpenAI API key ([Get one here](https://platform.openai.com))
 - Crawl4AI browser dependencies (run `llmify setup` after install)
 
-## Quick Setup (Recommended)
-
-Other launch commands (all open the TUI):
-
-```bash
-llm-ify
-llmify-cli
-```
-
-Run the quickstart script for your OS:
-
-```bash
-# Windows (PowerShell)
-scripts\quickstart.ps1
-
-# macOS/Linux
-./scripts/quickstart.sh
-```
-
-This creates a venv, installs deps, runs `crawl4ai-setup`, and launches the TUI.
-
-Every time after this just activate your venv and run 
-
-```bash
-python main.py
-```
-
-## Manual Setup
-
-1. Clone the repository:
+## Developer Quick Run
 
 ```bash
 git clone https://github.com/Chillbruhhh/LLM-ify.git
 cd LLM-ify
-```
-
-2. Create and activate a virtual environment:
-
-```bash
-# Windows
 python -m venv venv
-venv\Scripts\activate
-
-# macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
-```
-
-3. Install dependencies:
-
-```bash
+venv\Scripts\activate  # Windows
+# or: source venv/bin/activate (macOS/Linux)
 pip install -r requirements.txt
+crawl4ai-setup
+python main.py
 ```
 
-4. Run the setup command:
+Build packages (wheel + sdist):
 
 ```bash
-crawl4ai-setup
+python -m build
 ```
 
-This installs browser dependencies needed for Crawl4AI.
+## API Key Setup
 
-5. Set up your OpenAI API key:
+Set up your OpenAI API key:
 
    Option A: Using .env file (recommended)
 

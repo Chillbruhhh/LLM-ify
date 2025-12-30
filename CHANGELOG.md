@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.6] - 2025-12-30
+
+- TUI: hotkeys now show crawl/seeding toggles when Settings is open.
+- TUI: seeding section toggle moved to Shift+U to avoid conflicts.
+
 ## [0.1.5] - 2025-12-28
 
 - Added `llmify setup` command plus setup warnings (with optional force env var).

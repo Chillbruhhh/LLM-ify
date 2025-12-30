@@ -633,7 +633,16 @@ def run_interactive(args: argparse.Namespace) -> bool:
             if args.single_page:
                 hotkeys = "[Shift+M] Mode  [Enter] Edit URL  [Shift+S] Settings  [Q] Quit"
             else:
-                hotkeys = "[Shift+M] Mode  [Shift+D] Discovery  [Shift+Tab] Scope  [Enter] Edit URL  [Shift+S] Settings  [Q] Quit"
+                if show_settings:
+                    hotkeys = (
+                        "[Shift+M] Mode  [Shift+D] Discovery  [Shift+Tab] Scope  "
+                        "[Enter] Edit URL  [Shift+S] Settings  [Shift+C] Crawl Settings  [Shift+U] Seeding Settings  [Q] Quit"
+                    )
+                else:
+                    hotkeys = (
+                        "[Shift+M] Mode  [Shift+D] Discovery  [Shift+Tab] Scope  "
+                        "[Enter] Edit URL  [Shift+S] Settings  [Q] Quit"
+                    )
             stdscr.addstr(hotkey_row, 0, hotkeys[: max_x - 1], curses.color_pair(6))
         status_row = hotkey_row + 1
         if status_message and status_row < max_y - 2:
@@ -1202,7 +1211,7 @@ def run_interactive(args: argparse.Namespace) -> bool:
             elif key in (ord("S"),):
                 show_settings = not show_settings
                 selected = 0
-            elif key in (ord("s"),) and show_settings and not args.single_page:
+            elif key in (ord("U"),) and show_settings and not args.single_page:
                 show_seed = not show_seed
                 selected = 0
             elif key in (curses.KEY_BTAB, 353):

@@ -61,6 +61,12 @@ crawl4ai-setup
 python main.py
 ```
 
+Build packages (wheel + sdist):
+
+```bash
+python -m build
+```
+
 ## API Key Setup
 
 Set up your OpenAI API key:
